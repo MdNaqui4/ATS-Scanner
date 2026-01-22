@@ -1,0 +1,12 @@
+streamlit
+pdfplumber
+spacy
+# nltk
+scikit-learn
+pandas
+numpy
+sentence-transformers
+torch
+fastapi
+uvicorn
+python-multipart
