@@ -8,21 +8,23 @@ import traceback
 from src.semantic_matcher import semantic_similarity
 from src.skill_extractor import extract_skills, find_missing_skills
 from src.sentence_explainer import sentence_level_explainability
+from src.suggestions import generate_suggestions
 
 app = FastAPI(title="ATS Resume Analyzer")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # lock later
+    allow_origins=["*"],  # tighten later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
 @app.post("/api/resume/analyze")
 async def analyze_resume(
     resume: UploadFile = File(...),
-    job_description: str = Form(...)
+    job_description: str = Form("")
 ):
     try:
         # 1️⃣ Save PDF temporarily
@@ -43,22 +45,24 @@ async def analyze_resume(
         if not resume_text.strip():
             raise HTTPException(status_code=400, detail="Resume text could not be extracted")
 
-        # 3️⃣ Semantic similarity
-        score = semantic_similarity(resume_text, job_description)
+        # Normalize JD
+        jd_text = job_description.strip()
 
-        # 4️⃣ Skill extraction + normalization
+        # 3️⃣ Skills
         resume_skills = extract_skills(resume_text)
-        jd_skills = extract_skills(job_description)
+        jd_skills = extract_skills(jd_text) if jd_text else []
         missing_skills = find_missing_skills(resume_skills, jd_skills)
 
-        # 5️⃣ Sentence-level explainability
-        sentence_matches = sentence_level_explainability(
-            resume_text,
-            job_description
+        # 4️⃣ Semantic + sentence explainability (ONLY if JD exists)
+        semantic_score = semantic_similarity(resume_text, jd_text) if jd_text else 0.0
+        sentence_matches = (
+            sentence_level_explainability(resume_text, jd_text)
+            if jd_text else []
         )
 
         return {
-            "score": round(float(score), 2),
+            "mode": "resume_only" if not jd_text else "resume_vs_jd",
+            "score": round(float(semantic_score), 2),
             "resume_skills": sorted(resume_skills),
             "job_skills": sorted(jd_skills),
             "missing_skills": sorted(missing_skills),

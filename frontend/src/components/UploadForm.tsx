@@ -7,14 +7,22 @@ import { useRouter } from "next/navigation";
 export default function UploadForm() {
   const [resume, setResume] = useState<File | null>(null);
   const [jd, setJd] = useState("");
+  const [mode, setMode] = useState<"resume_only" | "resume_vs_jd">(
+    "resume_vs_jd"
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const router = useRouter();
 
   async function handleSubmit() {
-    if (!resume || !jd) {
-      setError("Please upload resume and paste job description");
+    if (!resume) {
+      setError("Please upload a resume PDF");
+      return;
+    }
+
+    if (mode === "resume_vs_jd" && !jd.trim()) {
+      setError("Please paste a job description");
       return;
     }
 
@@ -22,20 +30,24 @@ export default function UploadForm() {
       setLoading(true);
       setError(null);
 
-      const result = await analyzeResume(resume, jd);
+      const result = await analyzeResume(
+        resume,
+        mode === "resume_only" ? "" : jd
+      );
 
       sessionStorage.setItem("ats_result", JSON.stringify(result));
       router.push("/analyze");
     } catch (err) {
       console.error(err);
-      setError("Failed to analyze resume. Try again.");
+      setError("Failed to analyze resume. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="space-y-4 max-w-xl mx-auto">
+    <div className="space-y-5 max-w-xl mx-auto">
+      {/* Resume upload */}
       <input
         type="file"
         accept=".pdf"
@@ -43,16 +55,38 @@ export default function UploadForm() {
         className="block w-full"
       />
 
-      <textarea
-        placeholder="Paste Job Description"
-        className="w-full h-40 border rounded p-3"
-        value={jd}
-        onChange={(e) => setJd(e.target.value)}
-      />
+      {/* Mode toggle */}
+      <div className="flex gap-6 text-sm">
+        <label className="flex items-center gap-2">
+          <input
+            type="radio"
+            checked={mode === "resume_vs_jd"}
+            onChange={() => setMode("resume_vs_jd")}
+          />
+          Resume vs Job Description
+        </label>
 
-      {error && (
-        <p className="text-sm text-red-600">{error}</p>
+        <label className="flex items-center gap-2">
+          <input
+            type="radio"
+            checked={mode === "resume_only"}
+            onChange={() => setMode("resume_only")}
+          />
+          Resume Only Scan
+        </label>
+      </div>
+
+      {/* JD textarea */}
+      {mode === "resume_vs_jd" && (
+        <textarea
+          placeholder="Paste Job Description"
+          className="w-full h-40 border rounded p-3"
+          value={jd}
+          onChange={(e) => setJd(e.target.value)}
+        />
       )}
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       <button
         onClick={handleSubmit}
