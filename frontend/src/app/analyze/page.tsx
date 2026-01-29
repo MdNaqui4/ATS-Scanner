@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import ScoreCard from "@/components/ScoreCard";
 import SkillsSection from "@/components/SkillsSection";
 import SentenceMatches from "@/components/SentenceMatches";
+import QualityGrade from "@/components/QualityGrade";
+import StrengthsImprovements from "@/components/StrengthsImprovements";
 import { ATSResponse } from "@/types/ats";
 
 export default function AnalyzePage() {
@@ -52,14 +54,19 @@ export default function AnalyzePage() {
   );
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-      <ScoreCard score={data.score} />
+    <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+      {/* Score + Grade */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <ScoreCard score={data.score} />
+        {data.grade && <QualityGrade grade={data.grade} />}
+      </div>
 
+      {/* Skills */}
       <div className="grid md:grid-cols-2 gap-6">
         <SkillsSection
           title="Matched Skills"
           skills={matchedSkills}
-          variant="missing"
+          variant="good"
         />
 
         <SkillsSection
@@ -69,6 +76,13 @@ export default function AnalyzePage() {
         />
       </div>
 
+      {/* Strengths & Improvements */}
+      <StrengthsImprovements
+        strengths={data.strengths}
+        improvements={data.improvements}
+      />
+
+      {/* Sentence level explanation */}
       <SentenceMatches matches={data.sentence_explainability} />
     </div>
   );

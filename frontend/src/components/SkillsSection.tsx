@@ -21,20 +21,20 @@ export default function SkillsSection({
       <h3 className="font-semibold mb-3">{title}</h3>
 
       <div className="flex flex-wrap gap-2">
-        {skills.length === 0 && (
+        {skills.length === 0 ? (
           <span className="text-sm text-gray-500">
             No data available
           </span>
+        ) : (
+          skills.map((skill) => (
+            <span
+              key={skill}
+              className={`px-3 py-1 rounded-full text-sm font-medium ${color}`}
+            >
+              {skill}
+            </span>
+          ))
         )}
-
-        {skills.map((skill) => (
-          <span
-            key={skill}
-            className={`px-3 py-1 rounded-full text-sm font-medium ${color}`}
-          >
-            {skill}
-          </span>
-        ))}
       </div>
     </div>
   );
