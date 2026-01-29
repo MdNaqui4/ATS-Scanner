@@ -1,58 +1,48 @@
 import re
-from src.skill_normalizer import normalize_skill
+import csv
+from typing import Set, Optional
 
-# -----------------------
-# Skill Definitions
-# -----------------------
+_SKILLS_CACHE: Optional[Set[str]] = None
 
-CORE_SKILLS = {
-    "frontend": {"html", "css", "javascript", "react"},
-    "backend": {"python", "node", "api", "database"},
-}
 
-SECONDARY_SKILLS = {
-    "frontend": {"typescript", "webpack", "babel", "accessibility"},
-    "backend": {"docker", "aws", "redis"},
-}
+def load_skills(csv_path: str) -> Set[str]:
+    global _SKILLS_CACHE
 
-# -----------------------
-# Skill Extraction
-# -----------------------
+    if _SKILLS_CACHE is not None:
+        return _SKILLS_CACHE
 
-def extract_skills(text: str, skills_db=None):
+    skills = set()
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        reader = csv.reader(f)
+        for row in reader:
+            if row:
+                skills.add(row[0].strip().lower())
+
+    _SKILLS_CACHE = skills
+    return skills
+
+
+def extract_skills(text: str, skills_db: Optional[Set[str]] = None) -> Set[str]:
+    """
+    Backward-safe:
+    - If skills_db is not passed, return empty set instead of crashing
+    - Prevents 500 errors
+    """
+    if not text:
+        return set()
+
+    if skills_db is None:
+        return set()
+
     text = text.lower()
     found = set()
 
-    for word in re.findall(r"[a-zA-Z\.]+", text):
-        normalized = normalize_skill(word)
-        if normalized:
-            found.add(normalized)
+    for skill in skills_db:
+        if re.search(rf"\b{re.escape(skill)}\b", text):
+            found.add(skill)
 
     return found
 
 
 def find_missing_skills(resume_skills, jd_skills):
-    resume_set = set(resume_skills or [])
-    jd_set = set(jd_skills or [])
-
-    return list(jd_set - resume_set)
-
-
-# -----------------------
-# Skill Match Scoring
-# -----------------------
-
-def skill_match_score(resume_skills, job_skills, role="frontend"):
-    core = CORE_SKILLS.get(role, set())
-    secondary = SECONDARY_SKILLS.get(role, set())
-
-    job_skills = set(job_skills)
-    resume_skills = set(resume_skills)
-
-    core_required = core & job_skills
-    secondary_required = secondary & job_skills
-
-    core_match = len(core_required & resume_skills) / max(len(core_required), 1)
-    secondary_match = len(secondary_required & resume_skills) / max(len(secondary_required), 1)
-
-    return round((0.7 * core_match + 0.3 * secondary_match) * 100, 2)
+    return list(set(jd_skills or []) - set(resume_skills or []))

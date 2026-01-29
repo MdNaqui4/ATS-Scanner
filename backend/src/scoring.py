@@ -1,53 +1,100 @@
 # src/scoring.py
 
-from typing import Dict, List
-from src.semantic_matcher import semantic_similarity
-from src.sentence_explainer import sentence_level_explainability
-from src.skill_extractor import extract_skills, find_missing_skills
-from src.experience_matcher import experience_alignment_score
+from typing import Dict
 
 
-def skill_match_score(resume_skills: List[str], jd_skills: List[str]) -> float:
-    if not jd_skills:
-        return 0.0
-
-    matched = set(resume_skills) & set(jd_skills)
-    return len(matched) / len(jd_skills)
-
-
-def semantic_sentence_score(sentence_matches: List[Dict]) -> float:
-    if not sentence_matches:
-        return 0.0
-
-    scores = [m["similarity"] for m in sentence_matches]
-    return sum(scores) / len(scores)
+# -----------------------------
+# RAW SCORE WEIGHTS (LOCKED)
+# -----------------------------
+WEIGHTS = {
+    "skills": 0.35,
+    "experience": 0.30,
+    "keywords": 0.20,
+    "formatting": 0.15,
+}
 
 
-def compute_final_score(resume_text: str, jd_text: str) -> Dict:
-    resume_skills = extract_skills(resume_text)
-    jd_skills = extract_skills(jd_text)
+# -----------------------------
+# FINAL SCORE CALCULATION
+# -----------------------------
+def calculate_final_score(components: Dict[str, float]) -> int:
+    """
+    components example:
+    {
+        "skills": 78,
+        "experience": 72,
+        "keywords": 65,
+        "formatting": 80
+    }
+    """
 
-    missing_skills = find_missing_skills(resume_skills, jd_skills)
-
-    sentence_matches = sentence_level_explainability(resume_text, jd_text)
-
-    skill_score = skill_match_score(resume_skills, jd_skills)
-    semantic_score = semantic_sentence_score(sentence_matches)
-    experience_score = experience_alignment_score(resume_text, jd_text)
-
-    final_score = (
-        skill_score * 0.40 +
-        semantic_score * 0.35 +
-        experience_score * 0.15
+    raw_score = (
+        components.get("skills", 0) * WEIGHTS["skills"]
+        + components.get("experience", 0) * WEIGHTS["experience"]
+        + components.get("keywords", 0) * WEIGHTS["keywords"]
+        + components.get("formatting", 0) * WEIGHTS["formatting"]
     )
 
+    return calibrate_score(raw_score)
+
+
+# -----------------------------
+# SCORE CALIBRATION (VERY IMPORTANT)
+# -----------------------------
+def calibrate_score(score: float) -> int:
+    """
+    Human-aligned smoothing:
+    - Minimum realistic score: 35
+    - Maximum believable score: 95
+    """
+
+    calibrated = max(35, min(95, round(score)))
+    return calibrated
+
+
+# -----------------------------
+# CONFIDENCE LABEL
+# -----------------------------
+def confidence_label(score: int) -> str:
+    if score >= 80:
+        return "Excellent Fit"
+    elif score >= 65:
+        return "Good Match"
+    elif score >= 50:
+        return "Partial Match"
+    else:
+        return "Needs Improvement"
+
+
+# -----------------------------
+# RESUME GRADE
+# -----------------------------
+def resume_grade(score: int) -> str:
+    if score >= 85:
+        return "A+"
+    elif score >= 75:
+        return "A"
+    elif score >= 65:
+        return "B"
+    elif score >= 55:
+        return "C"
+    else:
+        return "D"
+
+
+# -----------------------------
+# MASTER SCORING OUTPUT
+# -----------------------------
+def build_score_payload(components: Dict[str, float]) -> Dict:
+    """
+    Final object consumed by frontend
+    """
+
+    final_score = calculate_final_score(components)
+
     return {
-        "final_score": round(final_score * 100, 2),
-        "skill_score": round(skill_score * 100, 2),
-        "semantic_score": round(semantic_score * 100, 2),
-        "experience_score": round(experience_score * 100, 2),
-        "resume_skills": sorted(resume_skills),
-        "job_skills": sorted(jd_skills),
-        "missing_skills": sorted(missing_skills),
-        "sentence_explainability": sentence_matches
+        "final_score": final_score,
+        "grade": resume_grade(final_score),
+        "confidence": confidence_label(final_score),
+        "breakdown": components,
     }
